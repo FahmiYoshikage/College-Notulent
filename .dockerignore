@@ -1,0 +1,10 @@
+# Ignore files not needed in the image build
+.git
+.gitignore
+vendor
+node_modules
+.DS_Store
+.env
+.vscode
+/tests
+README.md
