@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+    web:
+        build: .
+        ports:
+            - '41280:80'
+        volumes:
+            - ./:/var/www/html:cached
+        depends_on:
+            - db
+        environment:
+            APACHE_RUN_USER: www-data
+            APACHE_RUN_GROUP: www-data
+        restart: unless-stopped
+
+    db:
+        image: mysql:5.7
+        environment:
+            MYSQL_ROOT_PASSWORD: rootpassword
+            MYSQL_DATABASE: notula_platform
+            MYSQL_USER: notula
+            MYSQL_PASSWORD: notulapass
+        ports:
+            - '3306:3306'
+        # Mount the SQL file to have MySQL import it on first initialization
+        volumes:
+            - db_data:/var/lib/mysql
+            - ./notula_database.sql:/docker-entrypoint-initdb.d/notula_database.sql:ro
+        restart: unless-stopped
+
+volumes:
+    db_data:
