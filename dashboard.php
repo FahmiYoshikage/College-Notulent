@@ -1,321 +1,127 @@
-/* style.css - Global Stylesheet */
+<?php
+require_once 'config.php';
+requireLogin();
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+$conn = getConnection();
+$user_id = $_SESSION['user_id'];
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f5f7fa;
-    color: #333;
-    line-height: 1.6;
-}
+// Ambil kelompok yang diikuti user
+$stmt = $conn->prepare("
+    SELECT k.*, u.nama as creator_name, uk.role_kelompok
+    FROM kelompok k
+    JOIN user_kelompok uk ON k.id = uk.kelompok_id
+    JOIN users u ON k.created_by = u.id
+    WHERE uk.user_id = ?
+    ORDER BY k.created_at DESC
+");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$kelompok_list = $stmt->get_result();
 
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-}
+// Ambil notula terbaru
+$stmt = $conn->prepare("
+    SELECT n.*, k.nama_kelompok, u.nama as creator_name
+    FROM notula n
+    JOIN kelompok k ON n.kelompok_id = k.id
+    JOIN users u ON n.created_by = u.id
+    JOIN user_kelompok uk ON k.id = uk.kelompok_id
+    WHERE uk.user_id = ?
+    ORDER BY n.created_at DESC
+    LIMIT 5
+");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$notula_list = $stmt->get_result();
 
-/* Header */
-.header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 15px 0;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
+$flash = getFlashMessage();
+?>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Platform Notula</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <?php include 'header.php'; ?>
 
-.header-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
+    <div class="container">
+        <?php if ($flash): ?>
+            <div class="alert alert-<?= $flash['type'] ?>">
+                <?= $flash['message'] ?>
+            </div>
+        <?php endif; ?>
 
-.header h1 {
-    font-size: 24px;
-}
+        <div class="dashboard-header">
+            <h1>Dashboard</h1>
+            <p>Selamat datang, <strong><?= $_SESSION['nama'] ?></strong></p>
+        </div>
 
-.nav {
-    display: flex;
-    gap: 20px;
-    align-items: center;
-}
+        <div class="dashboard-grid">
+            <!-- Kelompok Section -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Kelompok Saya</h2>
+                    <a href="kelompok_create.php" class="btn btn-sm btn-primary">+ Buat Kelompok</a>
+                </div>
+                <div class="card-body">
+                    <?php if ($kelompok_list->num_rows > 0): ?>
+                        <div class="list-group">
+                            <?php while ($kelompok = $kelompok_list->fetch_assoc()): ?>
+                                <div class="list-item">
+                                    <div>
+                                        <h3><?= htmlspecialchars($kelompok['nama_kelompok']) ?></h3>
+                                        <p class="text-muted">
+                                            Kode: <?= $kelompok['kode_kelompok'] ?> | 
+                                            Role: <?= ucfirst($kelompok['role_kelompok']) ?>
+                                        </p>
+                                    </div>
+                                    <a href="kelompok_detail.php?id=<?= $kelompok['id'] ?>" class="btn btn-sm">Lihat</a>
+                                </div>
+                            <?php endwhile; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="text-center text-muted">Anda belum bergabung di kelompok manapun.</p>
+                        <div class="text-center mt-20">
+                            <a href="kelompok_join.php" class="btn btn-secondary">Gabung Kelompok</a>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
 
-.nav a {
-    color: white;
-    text-decoration: none;
-    padding: 8px 15px;
-    border-radius: 5px;
-    transition: background 0.3s;
-}
-
-.nav a:hover {
-    background: rgba(255,255,255,0.2);
-}
-
-/* Cards */
-.card {
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    margin-bottom: 20px;
-    overflow: hidden;
-}
-
-.card-header {
-    padding: 20px;
-    border-bottom: 1px solid #e1e8ed;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.card-header h2 {
-    font-size: 20px;
-    color: #333;
-}
-
-.card-body {
-    padding: 20px;
-}
-
-/* Buttons */
-.btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    text-decoration: none;
-    display: inline-block;
-    transition: all 0.3s;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-}
-
-.btn-secondary {
-    background: #6c757d;
-    color: white;
-}
-
-.btn-success {
-    background: #28a745;
-    color: white;
-}
-
-.btn-danger {
-    background: #dc3545;
-    color: white;
-}
-
-.btn-sm {
-    padding: 6px 12px;
-    font-size: 12px;
-}
-
-/* Form */
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 500;
-    color: #333;
-}
-
-.form-control {
-    width: 100%;
-    padding: 10px 15px;
-    border: 2px solid #e1e8ed;
-    border-radius: 5px;
-    font-size: 14px;
-    transition: border-color 0.3s;
-}
-
-.form-control:focus {
-    outline: none;
-    border-color: #667eea;
-}
-
-textarea.form-control {
-    resize: vertical;
-    min-height: 100px;
-}
-
-/* Alert */
-.alert {
-    padding: 15px 20px;
-    border-radius: 5px;
-    margin-bottom: 20px;
-}
-
-.alert-success {
-    background: #d4edda;
-    color: #155724;
-    border-left: 4px solid #28a745;
-}
-
-.alert-error {
-    background: #f8d7da;
-    color: #721c24;
-    border-left: 4px solid #dc3545;
-}
-
-.alert-info {
-    background: #d1ecf1;
-    color: #0c5460;
-    border-left: 4px solid #17a2b8;
-}
-
-/* List Group */
-.list-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.list-item {
-    padding: 15px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    transition: background 0.3s;
-}
-
-.list-item:hover {
-    background: #e9ecef;
-}
-
-.list-item h3 {
-    font-size: 16px;
-    margin-bottom: 5px;
-    color: #333;
-}
-
-/* Dashboard */
-.dashboard-header {
-    margin-bottom: 30px;
-}
-
-.dashboard-header h1 {
-    font-size: 32px;
-    color: #333;
-    margin-bottom: 10px;
-}
-
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-    gap: 20px;
-}
-
-/* Badge */
-.badge {
-    padding: 4px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-
-.badge-draft {
-    background: #ffc107;
-    color: #333;
-}
-
-.badge-final {
-    background: #28a745;
-    color: white;
-}
-
-.badge-perlu_revisi {
-    background: #dc3545;
-    color: white;
-}
-
-/* Utility */
-.text-center { text-align: center; }
-.text-muted { color: #6c757d; font-size: 14px; }
-.mt-20 { margin-top: 20px; }
-.mb-20 { margin-bottom: 20px; }
-
-/* Table */
-.table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
-
-.table th,
-.table td {
-    padding: 12px;
-    text-align: left;
-    border-bottom: 1px solid #e1e8ed;
-}
-
-.table th {
-    background: #f8f9fa;
-    font-weight: 600;
-    color: #333;
-}
-
-.table tr:hover {
-    background: #f8f9fa;
-}
-
-/* Modal */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-}
-
-.modal-content {
-    background: white;
-    margin: 5% auto;
-    padding: 30px;
-    border-radius: 10px;
-    max-width: 500px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.close {
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-    color: #999;
-}
-
-.close:hover {
-    color: #333;
-}
+            <!-- Notula Terbaru Section -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Notula Terbaru</h2>
+                    <a href="notula_create.php" class="btn btn-sm btn-primary">+ Buat Notula</a>
+                </div>
+                <div class="card-body">
+                    <?php if ($notula_list->num_rows > 0): ?>
+                        <div class="list-group">
+                            <?php while ($notula = $notula_list->fetch_assoc()): ?>
+                                <div class="list-item">
+                                    <div>
+                                        <h3><?= htmlspecialchars($notula['judul']) ?></h3>
+                                        <p class="text-muted">
+                                            <?= $notula['nama_kelompok'] ?> | 
+                                            <?= date('d M Y', strtotime($notula['tanggal'])) ?> |
+                                            <span class="badge badge-<?= $notula['status'] ?>">
+                                                <?= ucfirst($notula['status']) ?>
+                                            </span>
+                                        </p>
+                                    </div>
+                                    <a href="notula_detail.php?id=<?= $notula['id'] ?>" class="btn btn-sm">Lihat</a>
+                                </div>
+                            <?php endwhile; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="text-center text-muted">Belum ada notula.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+<?php $conn->close(); ?>
