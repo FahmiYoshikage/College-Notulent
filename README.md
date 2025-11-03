@@ -133,13 +133,19 @@ Notes:
 
 ### 7. Setup TinyMCE API Key
 
-TinyMCE rich text editor memerlukan API key. Untuk mendapatkan dan mengkonfigurasinya:
+TinyMCE rich text editor memerlukan API key dan domain registration. Untuk mendapatkan dan mengkonfigurasinya:
 
 1. Kunjungi https://www.tiny.cloud/auth/signup/ dan daftar gratis
-2. Copy API key dari dashboard
-3. Copy file `.env.example` menjadi `.env`: `cp .env.example .env`
-4. Edit file `.env` dan ganti `YOUR_TINYMCE_API_KEY` dengan API key Anda
-5. Restart container: `docker-compose down && docker-compose up -d`
+2. **PENTING:** Di dashboard TinyMCE, klik "Approved Domains" dan tambahkan:
+    - Untuk local: `localhost`
+    - Untuk production: `notulent.fahmi.app` (atau domain Anda)
+    - Atau gunakan wildcard: `*.fahmi.app`
+3. Copy API key dari dashboard
+4. Copy file `.env.example` menjadi `.env`: `cp .env.example .env`
+5. Edit file `.env` dan ganti `YOUR_TINYMCE_API_KEY` dengan API key Anda
+6. Restart container: `docker-compose down && docker-compose up -d`
+
+**Error "This domain is not registered"?** → Pastikan domain sudah ditambahkan di TinyMCE dashboard!
 
 **Penting:** File `.env` tidak akan di-commit ke git (sudah ada di `.gitignore`), jadi API key Anda aman!
 

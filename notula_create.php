@@ -18,7 +18,17 @@ $stmt->execute();
 $kelompok_list = $stmt->get_result();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $kelompok_id = (int)$_POST['kelompok_id'];
+    // Generate CSRF token if not exists
+    if (!isset($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    
+    // Verify CSRF token
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die('CSRF token validation failed');
+    }
+    
+    $kelompok_id = filter_var($_POST['kelompok_id'], FILTER_VALIDATE_INT);
     $judul = sanitizeInput($_POST['judul']);
     $tanggal = sanitizeInput($_POST['tanggal']);
     $waktu = sanitizeInput($_POST['waktu']);
@@ -29,11 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $errors = [];
     
-    if (empty($kelompok_id)) $errors[] = "Pilih kelompok";
+    if (!$kelompok_id || $kelompok_id <= 0) $errors[] = "Pilih kelompok";
     if (empty($judul)) $errors[] = "Judul harus diisi";
     if (empty($tanggal)) $errors[] = "Tanggal harus diisi";
     if (empty($waktu)) $errors[] = "Waktu harus diisi";
     if (empty($isi_notula)) $errors[] = "Isi notula harus diisi";
+    if (!in_array($status, ['draft', 'final', 'perlu_revisi'])) $errors[] = "Status tidak valid";
     
     if (empty($errors)) {
         // Simpan notula
@@ -45,6 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($stmt->execute()) {
             $notula_id = $conn->insert_id;
+            
+            // Clear draft from session after successful save
+            unset($_SESSION['notula_draft']);
+            
             setFlashMessage('success', 'Notula berhasil dibuat!');
             header("Location: notula_detail.php?id=$notula_id");
             exit();
@@ -53,8 +68,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         $stmt->close();
+    } else {
+        // Save errors to session for display after redirect
+        $_SESSION['notula_errors'] = $errors;
     }
 }
+
+// Generate CSRF token
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// Retrieve draft from session if exists
+$draft = isset($_SESSION['notula_draft']) ? $_SESSION['notula_draft'] : [];
 
 $conn->close();
 ?>
@@ -68,6 +94,75 @@ $conn->close();
     <!-- TinyMCE Rich Text Editor -->
     <script src="https://cdn.tiny.cloud/1/<?= TINYMCE_API_KEY ?>/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
     <script>
+        // Auto-save draft function
+        function saveDraft() {
+            const formData = {
+                kelompok_id: document.getElementById('kelompok_id').value,
+                judul: document.getElementById('judul').value,
+                tanggal: document.getElementById('tanggal').value,
+                waktu: document.getElementById('waktu').value,
+                lokasi: document.getElementById('lokasi').value,
+                daftar_peserta: document.getElementById('daftar_peserta').value,
+                isi_notula: tinymce.get('isi_notula') ? tinymce.get('isi_notula').getContent() : '',
+                status: document.getElementById('status').value,
+                timestamp: new Date().getTime()
+            };
+            
+            // Save to localStorage
+            localStorage.setItem('notula_draft', JSON.stringify(formData));
+            
+            // Save to server session via AJAX
+            fetch('save_draft.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            // Show saved indicator
+            const indicator = document.getElementById('save-indicator');
+            if (indicator) {
+                indicator.textContent = 'Draft tersimpan ' + new Date().toLocaleTimeString();
+                indicator.style.color = '#28a745';
+            }
+        }
+        
+        // Restore draft from localStorage
+        function restoreDraft() {
+            const draft = localStorage.getItem('notula_draft');
+            if (draft) {
+                const data = JSON.parse(draft);
+                
+                // Check if draft is not too old (24 hours)
+                const age = new Date().getTime() - (data.timestamp || 0);
+                if (age < 24 * 60 * 60 * 1000) {
+                    if (confirm('Ditemukan draft yang belum tersimpan. Restore draft?')) {
+                        document.getElementById('kelompok_id').value = data.kelompok_id || '';
+                        document.getElementById('judul').value = data.judul || '';
+                        document.getElementById('tanggal').value = data.tanggal || '';
+                        document.getElementById('waktu').value = data.waktu || '';
+                        document.getElementById('lokasi').value = data.lokasi || '';
+                        document.getElementById('daftar_peserta').value = data.daftar_peserta || '';
+                        document.getElementById('status').value = data.status || 'draft';
+                        
+                        // Wait for TinyMCE to initialize before setting content
+                        if (tinymce.get('isi_notula')) {
+                            tinymce.get('isi_notula').setContent(data.isi_notula || '');
+                        }
+                    } else {
+                        localStorage.removeItem('notula_draft');
+                    }
+                }
+            }
+        }
+        
+        // Clear draft when form is successfully submitted
+        function clearDraft() {
+            localStorage.removeItem('notula_draft');
+        }
+        
+        // Initialize TinyMCE
         tinymce.init({
             selector: '#isi_notula',
             height: 400,
@@ -75,11 +170,40 @@ $conn->close();
             plugins: [
                 'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
                 'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-                'insertdatetime', 'media', 'table', 'help', 'wordcount'
+                'insertdatetime', 'media', 'table', 'help', 'wordcount', 'autosave'
             ],
             toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | table | help',
             content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }',
-            language: 'id_ID'
+            language: 'id_ID',
+            setup: function(editor) {
+                editor.on('init', function() {
+                    // Restore draft after editor is ready
+                    restoreDraft();
+                });
+                
+                editor.on('change keyup', function() {
+                    // Auto-save every change (debounced)
+                    clearTimeout(window.autoSaveTimeout);
+                    window.autoSaveTimeout = setTimeout(saveDraft, 2000);
+                });
+            }
+        });
+        
+        // Auto-save on input changes
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputs = ['kelompok_id', 'judul', 'tanggal', 'waktu', 'lokasi', 'daftar_peserta', 'status'];
+            inputs.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('change', function() {
+                        clearTimeout(window.autoSaveTimeout);
+                        window.autoSaveTimeout = setTimeout(saveDraft, 2000);
+                    });
+                }
+            });
+            
+            // Clear draft on form submit
+            document.querySelector('form').addEventListener('submit', clearDraft);
         });
     </script>
 </head>
@@ -88,19 +212,26 @@ $conn->close();
 
     <div class="container">
         <div class="card" style="max-width: 900px; margin: 40px auto;">
-            <div class="card-header">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <h2>Buat Notula Baru</h2>
+                <small id="save-indicator" style="color: #6c757d; font-style: italic;">Auto-save aktif</small>
             </div>
             <div class="card-body">
-                <?php if (!empty($errors)): ?>
+                <?php 
+                $errors = isset($_SESSION['notula_errors']) ? $_SESSION['notula_errors'] : [];
+                unset($_SESSION['notula_errors']);
+                if (!empty($errors)): ?>
                     <div class="alert alert-error">
                         <?php foreach ($errors as $error): ?>
-                            <div><?= $error ?></div>
+                            <div><?= htmlspecialchars($error) ?></div>
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
 
                 <form method="POST">
+                    <!-- CSRF Token -->
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+                    
                     <div class="form-group">
                         <label for="kelompok_id">Kelompok/Mata Kuliah *</label>
                         <select id="kelompok_id" name="kelompok_id" class="form-control" required>

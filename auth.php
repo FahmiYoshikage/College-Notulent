@@ -4,8 +4,13 @@ require_once 'config.php';
 
 // Proses Registrasi
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register'])) {
+    // Verify CSRF token
+    if (!isset($_POST['csrf_token']) || !validateCSRFToken($_POST['csrf_token'])) {
+        die('CSRF token validation failed');
+    }
+    
     $nama = sanitizeInput($_POST['nama']);
-    $email = sanitizeInput($_POST['email']);
+    $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
     $role = sanitizeInput($_POST['role']);
@@ -19,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register'])) {
     if (empty($password)) $errors[] = "Password harus diisi";
     if ($password !== $confirm_password) $errors[] = "Password tidak cocok";
     if (strlen($password) < 6) $errors[] = "Password minimal 6 karakter";
+    if (!in_array($role, ['mahasiswa', 'dosen'])) $errors[] = "Role tidak valid";
     
     if (empty($errors)) {
         $conn = getConnection();
@@ -59,12 +65,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register'])) {
 
 // Proses Login
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
-    $email = sanitizeInput($_POST['email']);
+    // Verify CSRF token
+    if (!isset($_POST['csrf_token']) || !validateCSRFToken($_POST['csrf_token'])) {
+        die('CSRF token validation failed');
+    }
+    
+    $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
     $password = $_POST['password'];
     
     $errors = [];
     
     if (empty($email)) $errors[] = "Email harus diisi";
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Format email tidak valid";
     if (empty($password)) $errors[] = "Password harus diisi";
     
     if (empty($errors)) {
@@ -79,13 +91,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             $user = $result->fetch_assoc();
             
             if (password_verify($password, $user['password'])) {
-                // Login berhasil
+                // Login berhasil - regenerate session ID untuk keamanan
+                session_regenerate_id(true);
+                
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['nama'] = $user['nama'];
                 $_SESSION['email'] = $user['email'];
                 $_SESSION['role'] = $user['role'];
+                $_SESSION['login_time'] = time();
+                $_SESSION['user_ip'] = $_SERVER['REMOTE_ADDR'];
+                $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
                 
-                setFlashMessage('success', 'Login berhasil! Selamat datang, ' . $user['nama']);
+                setFlashMessage('success', 'Login berhasil! Selamat datang, ' . htmlspecialchars($user['nama']));
                 header("Location: dashboard.php");
                 exit();
             } else {
@@ -106,7 +123,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
 // Logout
 if (isset($_GET['logout'])) {
+    // Clear all session data
+    $_SESSION = array();
+    
+    // Delete session cookie
+    if (isset($_COOKIE[session_name()])) {
+        setcookie(session_name(), '', time()-3600, '/');
+    }
+    
+    // Destroy session
     session_destroy();
+    
+    setFlashMessage('success', 'Anda telah logout');
     header("Location: login.php");
     exit();
 }

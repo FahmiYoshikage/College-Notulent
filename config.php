@@ -1,7 +1,21 @@
 <?php
 // config.php - Konfigurasi Database dan Session
 
+// Konfigurasi session yang lebih aman
+ini_set('session.cookie_httponly', 1);
+ini_set('session.use_only_cookies', 1);
+ini_set('session.cookie_secure', 0); // Set to 1 if using HTTPS
+ini_set('session.cookie_samesite', 'Strict');
+
 session_start();
+
+// Regenerate session ID secara berkala untuk mencegah session fixation
+if (!isset($_SESSION['created'])) {
+    $_SESSION['created'] = time();
+} else if (time() - $_SESSION['created'] > 1800) { // 30 minutes
+    session_regenerate_id(true);
+    $_SESSION['created'] = time();
+}
 
 // Konfigurasi Database
 // For Docker: use 'db' as host, for local: use 'localhost'
@@ -29,24 +43,49 @@ function getConnection() {
 
 // Fungsi Helper untuk Keamanan
 function sanitizeInput($data) {
+    if (is_array($data)) {
+        return array_map('sanitizeInput', $data);
+    }
     $data = trim($data);
     $data = stripslashes($data);
     $data = htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
     return $data;
 }
 
-// Fungsi untuk sanitasi HTML dari Rich Text Editor
+// Fungsi untuk sanitasi HTML dari Rich Text Editor (mencegah XSS)
 function sanitizeHTML($html) {
     // Daftar tag yang diizinkan
-    $allowed_tags = '<p><br><strong><em><u><h1><h2><h3><h4><h5><h6><ul><ol><li><table><tr><td><th><thead><tbody><a><img><blockquote><code><pre>';
+    $allowed_tags = '<p><br><strong><em><u><s><h1><h2><h3><h4><h5><h6><ul><ol><li><table><tr><td><th><thead><tbody><tfoot><a><img><blockquote><code><pre><hr><div><span>';
     
+    // Strip tags yang tidak diizinkan
     $html = strip_tags($html, $allowed_tags);
     
-    // Bersihkan atribut berbahaya
-    $html = preg_replace('/(<[^>]+) on\w+="[^"]*"/i', '$1', $html);
-    $html = preg_replace('/(<[^>]+) style="[^"]*"/i', '$1', $html);
+    // Bersihkan event handlers berbahaya (XSS protection)
+    $html = preg_replace('/(<[^>]+) on\w+\s*=\s*["\'][^"\']*["\']/i', '$1', $html);
+    
+    // Bersihkan javascript: protocol dalam href dan src
+    $html = preg_replace('/(<[^>]+(?:href|src)\s*=\s*["\'])javascript:[^"\']*(["\']\s*>)/i', '$1#$2', $html);
+    
+    // Bersihkan data: protocol (bisa digunakan untuk XSS)
+    $html = preg_replace('/(<[^>]+(?:href|src)\s*=\s*["\'])data:[^"\']*(["\']\s*>)/i', '$1#$2', $html);
+    
+    // Batasi style attribute untuk mencegah CSS injection
+    $html = preg_replace('/(<[^>]+) style\s*=\s*["\'][^"\']*["\']/i', '$1', $html);
     
     return $html;
+}
+
+// Fungsi untuk validate CSRF token
+function validateCSRFToken($token) {
+    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+}
+
+// Fungsi untuk generate CSRF token
+function generateCSRFToken() {
+    if (!isset($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
 }
 
 // Cek apakah user sudah login

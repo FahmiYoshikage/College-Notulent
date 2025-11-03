@@ -135,6 +135,8 @@ $flash = getFlashMessage();
         <?php endif; ?>
 
         <form action="auth.php" method="POST">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken()) ?>">
+            
             <div class="form-group">
                 <label for="email">Email</label>
                 <input type="email" id="email" name="email" required>

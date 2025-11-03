@@ -1,13 +1,17 @@
 # Setup TinyMCE API Key
 
-TinyMCE memerlukan API key untuk menggunakan CDN mereka. Berikut langkah-langkahnya:
+TinyMCE memerlukan API key dan domain registration untuk menggunakan CDN mereka. Berikut langkah-langkahnya:
 
 ## 1. Dapatkan API Key Gratis
 
 1. Kunjungi: https://www.tiny.cloud/auth/signup/
 2. Daftar akun gratis (tidak perlu kartu kredit)
 3. Setelah login, Anda akan mendapatkan API key di dashboard
-4. Copy API key tersebut
+4. **PENTING:** Klik "Approved Domains" dan tambahkan domain Anda:
+    - Untuk local: `localhost`
+    - Untuk production: `notulent.fahmi.app`
+    - Atau gunakan wildcard: `*.fahmi.app`
+5. Copy API key tersebut
 
 ## 2. Konfigurasi API Key
 
@@ -58,31 +62,34 @@ Jika tidak ingin mendaftar API key, Anda bisa menggunakan TinyMCE self-hosted:
 1. Download TinyMCE: https://www.tiny.cloud/get-tiny/self-hosted/
 2. Ekstrak ke folder `js/tinymce/` di project
 3. Edit `notula_create.php` dan `notula_edit.php`, ubah:
-   ```html
-   <script src="js/tinymce/tinymce.min.js"></script>
-   ```
+    ```html
+    <script src="js/tinymce/tinymce.min.js"></script>
+    ```
 
 Namun menggunakan CDN dengan API key lebih direkomendasikan karena:
-- Selalu mendapat update terbaru
-- Loading lebih cepat (CDN global)
-- Tidak perlu download file besar
+
+-   Selalu mendapat update terbaru
+-   Loading lebih cepat (CDN global)
+-   Tidak perlu download file besar
 
 ## Keamanan
 
 ### ✅ AMAN - Menggunakan `.env` file (Recommended)
 
 File `.env` sudah otomatis di-ignore oleh git melalui `.gitignore`, sehingga:
-- ✅ API key Anda **TIDAK akan ter-commit** ke GitHub
-- ✅ Setiap developer bisa punya API key sendiri
-- ✅ API key production berbeda dengan development
-- ✅ Tidak ada sensitive data di repository
+
+-   ✅ API key Anda **TIDAK akan ter-commit** ke GitHub
+-   ✅ Setiap developer bisa punya API key sendiri
+-   ✅ API key production berbeda dengan development
+-   ✅ Tidak ada sensitive data di repository
 
 ### ⚠️ TIDAK AMAN - Hardcode di file PHP/YAML
 
 **JANGAN** hardcode API key langsung di:
-- ❌ `config.php` 
-- ❌ `docker-compose.yml`
-- ❌ File PHP lainnya
+
+-   ❌ `config.php`
+-   ❌ `docker-compose.yml`
+-   ❌ File PHP lainnya
 
 Karena file-file ini akan ter-commit ke git dan API key Anda akan **TEREXPOSE** ke publik!
 
@@ -91,23 +98,26 @@ Karena file-file ini akan ter-commit ke git dan API key Anda akan **TEREXPOSE** 
 Saat deploy ke server:
 
 1. Copy `.env.example` ke `.env` di server:
-   ```bash
-   cp .env.example .env
-   ```
+
+    ```bash
+    cp .env.example .env
+    ```
 
 2. Edit `.env` dengan credentials production:
-   ```bash
-   nano .env
-   # atau
-   vim .env
-   ```
+
+    ```bash
+    nano .env
+    # atau
+    vim .env
+    ```
 
 3. Set file permissions (optional tapi recommended):
-   ```bash
-   chmod 600 .env
-   ```
+
+    ```bash
+    chmod 600 .env
+    ```
 
 4. Start container:
-   ```bash
-   docker-compose up -d
-   ```
+    ```bash
+    docker-compose up -d
+    ```

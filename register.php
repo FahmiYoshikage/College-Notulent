@@ -122,6 +122,8 @@ unset($_SESSION['register_errors']);
         <?php endif; ?>
 
         <form action="auth.php" method="POST">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken()) ?>">
+            
             <div class="form-group">
                 <label for="nama">Nama Lengkap</label>
                 <input type="text" id="nama" name="nama" required>
