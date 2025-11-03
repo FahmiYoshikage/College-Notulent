@@ -4,10 +4,11 @@
 session_start();
 
 // Konfigurasi Database
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'notula_platform');
+// For Docker: use 'db' as host, for local: use 'localhost'
+define('DB_HOST', getenv('DB_HOST') ?: 'db');
+define('DB_USER', getenv('DB_USER') ?: 'notula');
+define('DB_PASS', getenv('DB_PASS') ?: 'notulapass');
+define('DB_NAME', getenv('DB_NAME') ?: 'notula_platform');
 
 // Koneksi Database
 function getConnection() {

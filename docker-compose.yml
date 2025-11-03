@@ -12,6 +12,10 @@ services:
         environment:
             APACHE_RUN_USER: www-data
             APACHE_RUN_GROUP: www-data
+            DB_HOST: db
+            DB_USER: notula
+            DB_PASS: notulapass
+            DB_NAME: notula_platform
         restart: unless-stopped
 
     db:
