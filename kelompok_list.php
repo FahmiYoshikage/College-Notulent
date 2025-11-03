@@ -7,7 +7,8 @@ $user_id = $_SESSION['user_id'];
 
 // Ambil semua kelompok yang diikuti user
 $stmt = $conn->prepare("
-    SELECT k.*, u.nama as creator_name, uk.role_kelompok,
+    SELECT k.id, k.nama_kelompok, k.deskripsi, k.kode_kelompok, k.created_by, k.created_at,
+           u.nama as creator_name, uk.role_kelompok,
            COUNT(DISTINCT uk2.user_id) as jumlah_anggota,
            COUNT(DISTINCT n.id) as jumlah_notula
     FROM kelompok k
@@ -16,7 +17,7 @@ $stmt = $conn->prepare("
     LEFT JOIN user_kelompok uk2 ON k.id = uk2.kelompok_id
     LEFT JOIN notula n ON k.id = n.kelompok_id
     WHERE uk.user_id = ?
-    GROUP BY k.id
+    GROUP BY k.id, k.nama_kelompok, k.deskripsi, k.kode_kelompok, k.created_by, k.created_at, u.nama, uk.role_kelompok
     ORDER BY k.created_at DESC
 ");
 $stmt->bind_param("i", $user_id);

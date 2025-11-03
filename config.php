@@ -10,6 +10,11 @@ define('DB_USER', getenv('DB_USER') ?: 'notula');
 define('DB_PASS', getenv('DB_PASS') ?: 'notulapass');
 define('DB_NAME', getenv('DB_NAME') ?: 'notula_platform');
 
+// TinyMCE API Key Configuration
+// Get your free API key from: https://www.tiny.cloud/auth/signup/
+// Set the API key via environment variable or replace 'YOUR_TINYMCE_API_KEY' below
+define('TINYMCE_API_KEY', getenv('TINYMCE_API_KEY') ?: 'YOUR_TINYMCE_API_KEY');
+
 // Koneksi Database
 function getConnection() {
     $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);

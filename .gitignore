@@ -1,0 +1,23 @@
+# Ignore environment files with sensitive data
+.env
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore temporary files
+*.log
+*.tmp
+*~
+
+# Ignore vendor/dependencies (if using composer)
+/vendor/
+
+# Ignore uploaded files
+/uploads/
